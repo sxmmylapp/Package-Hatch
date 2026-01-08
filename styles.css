@@ -1,0 +1,342 @@
+/* Reset & Base */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #1a1a2e;
+    background: #ffffff;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+h1, h2, h3 {
+    line-height: 1.2;
+    font-weight: 700;
+}
+
+h1 {
+    font-size: 2.25rem;
+    font-weight: 800;
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+/* CTA Buttons */
+.cta-button {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+    text-decoration: none;
+    font-size: 1.125rem;
+    font-weight: 600;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    min-width: 280px;
+    text-align: center;
+}
+
+.cta-button:active {
+    transform: scale(0.98);
+}
+
+.cta-savings {
+    font-size: 0.875rem;
+    font-weight: 500;
+    opacity: 0.9;
+    margin-top: 0.25rem;
+}
+
+.cta-large {
+    font-size: 1.25rem;
+    padding: 1.25rem 2.5rem;
+}
+
+/* Hero Section */
+.hero {
+    position: relative;
+    height: 85vh;
+    min-height: 500px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.hero-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.85) 0%,
+        rgba(0, 0, 0, 0.4) 50%,
+        rgba(0, 0, 0, 0.1) 100%
+    );
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 2rem 1.5rem 3rem;
+    color: white;
+}
+
+.hero-content h1 {
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.hero-subtitle {
+    font-size: 1.125rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+}
+
+/* Problem Section */
+.problem {
+    padding: 3rem 1.5rem;
+    background: #f8fafc;
+}
+
+.problem-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.problem-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: white;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.problem-icon {
+    font-size: 1.5rem;
+}
+
+.problem-item p {
+    font-size: 1rem;
+    color: #475569;
+}
+
+/* Solution Section */
+.solution {
+    padding: 3rem 1.5rem;
+}
+
+.solution-image {
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    border-radius: 16px;
+    display: block;
+    margin: 0 auto 2rem;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.features {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.feature-icon {
+    font-size: 1.75rem;
+    flex-shrink: 0;
+}
+
+.feature-text strong {
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 0.125rem;
+}
+
+.feature-text p {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+/* Gallery Section */
+.gallery {
+    padding: 3rem 0;
+    background: #f8fafc;
+}
+
+.gallery h2 {
+    padding: 0 1.5rem;
+}
+
+.gallery-scroll {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    padding: 0 1.5rem 1rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.gallery-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.gallery-scroll img {
+    flex-shrink: 0;
+    width: 85%;
+    max-width: 320px;
+    height: auto;
+    border-radius: 12px;
+    scroll-snap-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Offer Section */
+.offer {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    color: white;
+}
+
+.offer-badge {
+    display: inline-block;
+    background: #facc15;
+    color: #1a1a2e;
+    font-size: 0.875rem;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 50px;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.price-container {
+    margin-bottom: 1.5rem;
+}
+
+.price-original {
+    font-size: 1.25rem;
+    text-decoration: line-through;
+    opacity: 0.6;
+    margin-right: 0.75rem;
+}
+
+.price-current {
+    font-size: 3rem;
+    font-weight: 800;
+}
+
+.offer-perks {
+    list-style: none;
+    margin-bottom: 2rem;
+}
+
+.offer-perks li {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.95;
+}
+
+.offer .cta-button {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+}
+
+/* Footer */
+.footer {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    background: #f1f5f9;
+}
+
+.footer-brand {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.footer-tagline {
+    color: #64748b;
+    margin-bottom: 1.5rem;
+}
+
+.cta-footer {
+    margin-bottom: 1.5rem;
+}
+
+.footer-contact {
+    font-size: 0.875rem;
+    color: #94a3b8;
+}
+
+/* Responsive - Larger phones */
+@media (min-width: 400px) {
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 1.75rem;
+    }
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+    .hero {
+        height: 70vh;
+    }
+    
+    h1 {
+        font-size: 3rem;
+    }
+    
+    .problem-list,
+    .features {
+        max-width: 500px;
+    }
+    
+    .gallery-scroll img {
+        width: 45%;
+    }
+}
