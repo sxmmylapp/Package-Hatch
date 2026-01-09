@@ -121,6 +121,24 @@ h2 {
     margin-bottom: 1.5rem;
 }
 
+/* Color Options Section */
+.color-options {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: white;
+    text-align: center;
+    padding: 2.5rem 1.5rem;
+}
+
+.color-options h2 {
+    margin-bottom: 0.5rem;
+    color: white;
+}
+
+.color-options p {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
 /* Problem Section */
 .problem {
     padding: 3rem 1.5rem;
@@ -283,6 +301,13 @@ h2 {
 .offer .cta-button {
     background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
     box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+}
+
+.offer-urgency {
+    font-size: 1.1rem;
+    font-style: italic;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
 }
 
 /* About Me Section */
