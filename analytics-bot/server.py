@@ -30,11 +30,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 QR_API_KEY = os.getenv('QR_API_KEY')
+QR_CODE_ID = os.getenv('QR_CODE_ID', '88145711')  # Your QR code ID
 TIMEZONE = pytz.timezone(os.getenv('TIMEZONE', 'America/New_York'))
 DATABASE = 'analytics.db'
 
@@ -56,6 +56,15 @@ def init_db():
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 data TEXT,
                 amount_cents INTEGER DEFAULT 0
+            )
+        ''')
+        # Table to store QR scan count snapshots for calculating hourly changes
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS qr_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                total_scans INTEGER,
+                unique_scans INTEGER
             )
         ''')
         conn.commit()
@@ -195,6 +204,14 @@ def stripe_webhook():
             # Send immediate notification for purchases
             send_purchase_notification(session)
         
+        # Handle expired checkout (user abandoned)
+        elif event['type'] == 'checkout.session.expired':
+            session = event['data']['object']
+            log_event('expired', {
+                'session_id': session.get('id'),
+                'amount': session.get('amount_total', 0) / 100
+            })
+        
         return jsonify({'received': True}), 200
     except stripe.error.SignatureVerificationError as e:
         print(f"Stripe signature verification failed: {e}")
@@ -275,7 +292,7 @@ def get_stats(hours: int = 1) -> dict:
         ''', (today_start.isoformat(),)).fetchall()
     
     def dict_from_stats(stats):
-        result = {'qr_scan': 0, 'click': 0, 'purchase': 0, 'revenue': 0}
+        result = {'qr_scan': 0, 'click': 0, 'purchase': 0, 'expired': 0, 'revenue': 0}
         for row in stats:
             result[row['event_type']] = row['count']
             if row['event_type'] == 'purchase':
@@ -288,9 +305,75 @@ def get_stats(hours: int = 1) -> dict:
     }
 
 
+def get_qr_scan_count() -> dict:
+    """
+    Fetch QR code scan counts from QR Code Generator API.
+    Calculates hourly scans by comparing to the last stored snapshot.
+    Returns total, unique, and hourly scan counts.
+    """
+    if not QR_API_KEY or not QR_CODE_ID:
+        return {'total': 0, 'unique': 0, 'last_hour': 0, 'today': 0}
+    
+    url = f"https://api.qr-code-generator.com/v1/qr-codes/{QR_CODE_ID}/scans/total"
+    headers = {
+        'Authorization': f'Key {QR_API_KEY}'
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        current_total = data.get('total', 0)
+        current_unique = data.get('unique', 0)
+        
+        # Get the last snapshot to calculate hourly scans
+        with get_db() as conn:
+            # Get snapshot from ~1 hour ago
+            hour_ago = (datetime.utcnow() - timedelta(hours=1)).isoformat()
+            hour_snapshot = conn.execute('''
+                SELECT total_scans FROM qr_snapshots 
+                WHERE timestamp <= ? 
+                ORDER BY timestamp DESC LIMIT 1
+            ''', (hour_ago,)).fetchone()
+            
+            # Get snapshot from start of today (UTC)
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            today_snapshot = conn.execute('''
+                SELECT total_scans FROM qr_snapshots 
+                WHERE timestamp <= ? 
+                ORDER BY timestamp DESC LIMIT 1
+            ''', (today_start,)).fetchone()
+            
+            # Store current snapshot
+            conn.execute(
+                'INSERT INTO qr_snapshots (total_scans, unique_scans) VALUES (?, ?)',
+                (current_total, current_unique)
+            )
+            conn.commit()
+        
+        # Calculate differences
+        last_hour_scans = current_total - (hour_snapshot['total_scans'] if hour_snapshot else current_total)
+        today_scans = current_total - (today_snapshot['total_scans'] if today_snapshot else current_total)
+        
+        # Ensure non-negative (in case of data issues)
+        last_hour_scans = max(0, last_hour_scans)
+        today_scans = max(0, today_scans)
+        
+        return {
+            'total': current_total,
+            'unique': current_unique,
+            'last_hour': last_hour_scans,
+            'today': today_scans
+        }
+    except Exception as e:
+        print(f"QR API error: {e}")
+        return {'total': 0, 'unique': 0, 'last_hour': 0, 'today': 0}
+
+
 def send_hourly_report():
     """Send the hourly analytics report to Telegram."""
     stats = get_stats(hours=1)
+    qr_stats = get_qr_scan_count()  # Fetch from QR Code Generator API
     now = datetime.now(TIMEZONE)
     
     # Calculate conversion rates
@@ -302,7 +385,10 @@ def send_hourly_report():
     hour = stats['hour']
     today = stats['today']
     
-    scan_to_click = calc_rate(today['click'], today['qr_scan'])
+    # Use QR API scans for conversion calculation if available
+    qr_today = qr_stats['today'] if qr_stats['today'] > 0 else today['qr_scan']
+    
+    scan_to_click = calc_rate(today['click'], qr_today)
     click_to_purchase = calc_rate(today['purchase'], today['click'])
     
     message = (
@@ -310,8 +396,9 @@ def send_hourly_report():
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
         f"🔲 <b>QR Code Scans</b>\n"
-        f"   • Last hour: {hour['qr_scan']}\n"
-        f"   • Today: {today['qr_scan']}\n\n"
+        f"   • Last hour: {qr_stats['last_hour']}\n"
+        f"   • Today: {qr_stats['today']}\n"
+        f"   • All-time: {qr_stats['total']} ({qr_stats['unique']} unique)\n\n"
         
         f"🖱️ <b>Pre-order Clicks</b>\n"
         f"   • Last hour: {hour['click']}\n"
@@ -320,6 +407,10 @@ def send_hourly_report():
         f"💰 <b>Completed Purchases</b>\n"
         f"   • Last hour: {hour['purchase']} (${hour['revenue']:.0f})\n"
         f"   • Today: {today['purchase']} (${today['revenue']:.0f})\n\n"
+        
+        f"❌ <b>Abandoned Checkouts</b>\n"
+        f"   • Last hour: {hour['expired']}\n"
+        f"   • Today: {today['expired']}\n\n"
         
         f"📈 <b>Conversion Rate (Today)</b>\n"
         f"   • Scan → Click: {scan_to_click}\n"
