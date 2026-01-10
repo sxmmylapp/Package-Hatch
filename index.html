@@ -155,6 +155,51 @@
             <a href="mailto:hello@deliveryhatchllc.com">hello@deliveryhatchllc.com</a>
         </div>
     </footer>
+
+    <!-- Analytics Click Tracking -->
+    <script>
+        // Delivery Hatch Analytics Server
+        const ANALYTICS_URL = 'https://delivery-hatch-analytics-production.up.railway.app';
+
+        function trackClick(buttonName) {
+            // Fire async tracking (doesn't block user)
+            const data = JSON.stringify({
+                button: buttonName,
+                timestamp: Date.now(),
+                page: window.location.pathname
+            });
+
+            // Use sendBeacon for reliable async tracking
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(ANALYTICS_URL + '/track/click', data);
+            } else {
+                // Fallback for older browsers
+                fetch(ANALYTICS_URL + '/track/click', {
+                    method: 'POST',
+                    body: data,
+                    keepalive: true
+                });
+            }
+
+            // Also fire GA4 event
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'begin_checkout', {
+                    'event_category': 'engagement',
+                    'event_label': buttonName
+                });
+            }
+        }
+
+        // Add click tracking to all CTA buttons
+        document.addEventListener('DOMContentLoaded', function () {
+            const ctaButtons = document.querySelectorAll('.cta-button');
+            ctaButtons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    trackClick(this.textContent.trim().split('\\n')[0]);
+                });
+            });
+        });
+    </script>
 </body>
 
 </html>
