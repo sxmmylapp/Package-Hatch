@@ -33,10 +33,11 @@
         <div class="hero-content">
             <h1>Deliveries aren't slowing down. Your home should keep up.</h1>
             <p class="hero-subtitle">Your packages. Your garage. Secured.</p>
-            <a href="https://buy.stripe.com/5kQbJ06WA4rpg8Lamn9Ve01" class="cta-button">
-                Pre-Order Now — $45 Down
-                <span class="cta-savings">+ FREE Installation</span>
-            </a>
+            <form class="signup-form" id="hero-signup">
+                <input type="email" placeholder="Enter your email" required>
+                <button type="submit">Notify Me at Launch</button>
+            </form>
+            <p class="signup-message" id="hero-message"></p>
         </div>
     </section>
 
@@ -113,19 +114,18 @@
 
     <!-- Offer Section -->
     <section class="offer">
-        <div class="offer-badge">Pre-Order Special</div>
-        <div class="price-container">
-            <span class="price-current">$45 Down Payment</span>
-        </div>
+        <div class="offer-badge">Coming Soon</div>
+        <h2 class="offer-heading">Be First to Know</h2>
         <ul class="offer-perks">
-            <li>✓ Just $45 today, $404 at installation</li>
+            <li>✓ Early access pricing</li>
             <li>✓ FREE professional installation</li>
-            <li>✓ Ships Spring 2026</li>
+            <li>✓ Launching Spring 2026</li>
         </ul>
-        <p class="offer-urgency">More deliveries are coming. Be ready.</p>
-        <a href="https://buy.stripe.com/5kQbJ06WA4rpg8Lamn9Ve01" class="cta-button cta-large">
-            Claim Your Pre-Order
-        </a>
+        <form class="signup-form signup-form-dark" id="offer-signup">
+            <input type="email" placeholder="Enter your email" required>
+            <button type="submit">Get Notified</button>
+        </form>
+        <p class="signup-message" id="offer-message"></p>
     </section>
 
     <!-- About Me Section -->
@@ -150,9 +150,11 @@
     <footer class="footer">
         <div class="footer-brand">Delivery Hatch, LLC</div>
         <p class="footer-tagline">Your packages. Finally protected.</p>
-        <a href="https://buy.stripe.com/5kQbJ06WA4rpg8Lamn9Ve01" class="cta-button cta-footer">
-            Get Yours Now
-        </a>
+        <form class="signup-form signup-form-compact" id="footer-signup">
+            <input type="email" placeholder="Your email" required>
+            <button type="submit">Notify Me</button>
+        </form>
+        <p class="signup-message" id="footer-message"></p>
         <div class="footer-contact">
             <a href="tel:+17179838851">(717) 983-8851</a>
             <span class="footer-divider">•</span>
@@ -160,46 +162,62 @@
         </div>
     </footer>
 
-    <!-- Analytics Click Tracking -->
+    <!-- Email Signup Script -->
     <script>
-        // Delivery Hatch Analytics Server
         const ANALYTICS_URL = 'https://delivery-hatch-analytics-production.up.railway.app';
 
-        function trackClick(buttonName) {
-            // Fire async tracking (doesn't block user)
-            const data = JSON.stringify({
-                button: buttonName,
-                timestamp: Date.now(),
-                page: window.location.pathname
-            });
-
-            // Use sendBeacon for reliable async tracking
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(ANALYTICS_URL + '/track/click', data);
-            } else {
-                // Fallback for older browsers
-                fetch(ANALYTICS_URL + '/track/click', {
-                    method: 'POST',
-                    body: data,
-                    keepalive: true
-                });
-            }
-
-            // Also fire GA4 event
-            if (typeof gtag !== 'undefined') {
-                gtag('event', 'begin_checkout', {
-                    'event_category': 'engagement',
-                    'event_label': buttonName
-                });
-            }
-        }
-
-        // Add click tracking to all CTA buttons
+        // Handle all signup forms
         document.addEventListener('DOMContentLoaded', function () {
-            const ctaButtons = document.querySelectorAll('.cta-button');
-            ctaButtons.forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    trackClick(this.textContent.trim().split('\\n')[0]);
+            const forms = document.querySelectorAll('.signup-form');
+
+            forms.forEach(function (form) {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+
+                    const input = form.querySelector('input[type="email"]');
+                    const button = form.querySelector('button');
+                    const messageEl = form.nextElementSibling;
+                    const email = input.value.trim();
+
+                    if (!email) return;
+
+                    // Disable form while submitting
+                    button.disabled = true;
+                    button.textContent = 'Sending...';
+
+                    try {
+                        const response = await fetch(ANALYTICS_URL + '/signup', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: email, source: form.id })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            messageEl.textContent = data.message || "Thanks! We'll notify you at launch.";
+                            messageEl.className = 'signup-message success';
+                            input.value = '';
+                            form.style.display = 'none';
+
+                            // Track signup in GA4
+                            if (typeof gtag !== 'undefined') {
+                                gtag('event', 'sign_up', {
+                                    'event_category': 'engagement',
+                                    'event_label': form.id
+                                });
+                            }
+                        } else {
+                            messageEl.textContent = data.error || 'Something went wrong. Please try again.';
+                            messageEl.className = 'signup-message error';
+                        }
+                    } catch (err) {
+                        messageEl.textContent = 'Connection error. Please try again.';
+                        messageEl.className = 'signup-message error';
+                    }
+
+                    button.disabled = false;
+                    button.textContent = 'Notify Me';
                 });
             });
         });
