@@ -552,15 +552,15 @@ scheduler = BackgroundScheduler(timezone=TIMEZONE)
 
 def start_scheduler():
     """Start the APScheduler for hourly reports."""
-    # Run at the top of every hour
-    scheduler.add_job(
-        send_hourly_report,
-        CronTrigger(minute=0),  # Every hour at :00
-        id='hourly_report',
-        replace_existing=True
-    )
-    scheduler.start()
-    print(f"Scheduler started. Next report at the top of the next hour.")
+    # DISABLED: Hourly reports turned off per user request
+    # scheduler.add_job(
+    #     send_hourly_report,
+    #     CronTrigger(minute=0),  # Every hour at :00
+    #     id='hourly_report',
+    #     replace_existing=True
+    # )
+    # scheduler.start()
+    print(f"Scheduler disabled - hourly reports turned off.")
 
 
 # ============================================================================
