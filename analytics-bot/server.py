@@ -31,7 +31,9 @@ load_dotenv()
 app = Flask(__name__)
 
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+# Support multiple chat IDs (comma separated)
+chat_ids_str = os.getenv('TELEGRAM_CHAT_ID', '')
+TELEGRAM_CHAT_IDS = [cid.strip() for cid in chat_ids_str.split(',') if cid.strip()]
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 QR_API_KEY = os.getenv('QR_API_KEY')
 QR_CODE_ID = os.getenv('QR_CODE_ID', '88145711')  # Your QR code ID
@@ -65,6 +67,15 @@ def init_db():
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 total_scans INTEGER,
                 unique_scans INTEGER
+            )
+        ''')
+        # Table to store email signups for launch notification
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS email_signups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                source TEXT DEFAULT 'website'
             )
         ''')
         conn.commit()
@@ -168,6 +179,73 @@ def track_click():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/signup', methods=['POST', 'OPTIONS'])
+def email_signup():
+    """
+    Receive email signups for launch notification.
+    Stores in SQLite and optionally sends to Google Sheets.
+    """
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
+    
+    try:
+        # Parse request data
+        if request.content_type and 'json' in request.content_type:
+            data = request.get_json()
+        else:
+            try:
+                data = json.loads(request.data.decode('utf-8'))
+            except:
+                data = {}
+        
+        email = data.get('email', '').strip().lower()
+        
+        # Basic email validation
+        if not email or '@' not in email or '.' not in email:
+            response = jsonify({'success': False, 'error': 'Invalid email address'})
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            return response, 400
+        
+        # Store in database
+        with get_db() as conn:
+            try:
+                conn.execute(
+                    'INSERT INTO email_signups (email, source) VALUES (?, ?)',
+                    (email, data.get('source', 'website'))
+                )
+                conn.commit()
+                
+                # Get total signup count
+                count = conn.execute('SELECT COUNT(*) FROM email_signups').fetchone()[0]
+                
+            except sqlite3.IntegrityError:
+                # Email already exists
+                response = jsonify({'success': True, 'message': 'Already signed up!'})
+                response.headers['Access-Control-Allow-Origin'] = '*'
+                return response, 200
+        
+        # Send Telegram notification
+        send_signup_notification(email, count)
+        
+        # Log as event too
+        log_event('email_signup', {'email': email})
+        
+        response = jsonify({'success': True, 'message': 'Thanks! We\'ll notify you at launch.'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response, 200
+        
+    except Exception as e:
+        print(f"Email signup error: {e}")
+        response = jsonify({'success': False, 'error': 'Something went wrong'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response, 500
+
+
 @app.route('/webhook/stripe', methods=['POST'])
 def stripe_webhook():
     """
@@ -226,25 +304,29 @@ def stripe_webhook():
 # ============================================================================
 
 def send_telegram_message(text: str):
-    """Send a message to Telegram."""
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    """Send a message to all configured Telegram chats."""
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_IDS:
         print(f"Telegram not configured. Message: {text}")
         return False
     
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': text,
-        'parse_mode': 'HTML'
-    }
+    success = True
     
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        response.raise_for_status()
-        return True
-    except Exception as e:
-        print(f"Telegram error: {e}")
-        return False
+    for chat_id in TELEGRAM_CHAT_IDS:
+        payload = {
+            'chat_id': chat_id,
+            'text': text,
+            'parse_mode': 'HTML'
+        }
+        
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"Telegram error for chat {chat_id}: {e}")
+            success = False
+            
+    return success
 
 
 def send_purchase_notification(session: dict):
@@ -259,6 +341,17 @@ def send_purchase_notification(session: dict):
         f"🕐 Time: {datetime.now(TIMEZONE).strftime('%I:%M %p')}"
     )
     
+    send_telegram_message(message)
+
+
+def send_signup_notification(email: str, total_count: int):
+    """Send a notification when someone signs up for launch notification."""
+    message = (
+        "📧 <b>New Email Signup!</b>\n\n"
+        f"✉️ Email: {email}\n"
+        f"📊 Total signups: {total_count}\n"
+        f"🕐 Time: {datetime.now(TIMEZONE).strftime('%I:%M %p')}"
+    )
     send_telegram_message(message)
 
 
@@ -414,9 +507,7 @@ def send_hourly_report():
         
         f"📈 <b>Conversion Rate (Today)</b>\n"
         f"   • Scan → Click: {scan_to_click}\n"
-        f"   • Click → Purchase: {click_to_purchase}\n\n"
-        
-        f"🕐 {now.strftime('%I:%M %p')} ET"
+        f"   • Click → Purchase: {click_to_purchase}"
     )
     
     send_telegram_message(message)
@@ -438,6 +529,18 @@ def debug_send_report():
     """Manually trigger the hourly report."""
     send_hourly_report()
     return jsonify({'status': 'sent'})
+
+
+@app.route('/emails', methods=['GET'])
+def list_emails():
+    """List all email signups (for exporting)."""
+    with get_db() as conn:
+        rows = conn.execute(
+            'SELECT email, timestamp, source FROM email_signups ORDER BY timestamp DESC'
+        ).fetchall()
+    
+    emails = [{'email': r['email'], 'timestamp': r['timestamp'], 'source': r['source']} for r in rows]
+    return jsonify({'count': len(emails), 'emails': emails})
 
 
 # ============================================================================
